@@ -1,30 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DisplayFormat {
+    #[default]
     SongArtist,
     ArtistSong,
 }
 
-impl Default for DisplayFormat {
-    fn default() -> Self {
-        Self::SongArtist
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum IdleBehavior {
+    #[default]
     ClearStatus,
     ShowPaused,
-}
-
-impl Default for IdleBehavior {
-    fn default() -> Self {
-        Self::ClearStatus
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
