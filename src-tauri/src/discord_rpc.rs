@@ -194,10 +194,10 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
         if try_connect(&mut client) {
             connected = true;
             set_status(&status, DiscordStatus::Connected);
-            log::info!("Discord IPC connected");
+            tracing::info!("Discord IPC connected");
             break;
         }
-        log::warn!(
+        tracing::warn!(
             "Discord connect attempt {} failed, retrying in {}s",
             i + 1,
             delay
@@ -227,7 +227,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
 
     if !connected {
         set_status(&status, DiscordStatus::Disconnected);
-        log::warn!("Discord initial connection failed; will retry in background");
+        tracing::warn!("Discord initial connection failed; will retry in background");
     }
 
     // Replay any track that arrived while we were connecting
@@ -241,7 +241,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
             };
             if let Err(e) = set_activity_from_track(&mut client, track, art_url.as_deref(), &opts)
             {
-                log::warn!("Failed to set initial Discord activity: {e}");
+                tracing::warn!("Failed to set initial Discord activity: {e}");
                 connected = false;
                 set_status(
                     &status,
@@ -251,9 +251,17 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
         }
     }
 
-    // Main event loop
+    // Main event loop — with exponential backoff for reconnection
+    let mut reconnect_backoff = Duration::from_secs(1);
+
     loop {
-        match rx.recv_timeout(Duration::from_secs(1)) {
+        let timeout = if connected {
+            Duration::from_secs(1)
+        } else {
+            reconnect_backoff
+        };
+
+        match rx.recv_timeout(timeout) {
             Ok(DiscordCommand::UpdateTrack(track, art_url, opts)) => {
                 pending_track = Some((track.clone(), art_url.clone(), false));
                 if !connected {
@@ -262,7 +270,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                 if let Err(e) =
                     set_activity_from_track(&mut client, &track, art_url.as_deref(), &opts)
                 {
-                    log::warn!("Failed to set Discord activity: {e}");
+                    tracing::warn!("Failed to set Discord activity: {e}");
                     connected = false;
                     set_status(
                         &status,
@@ -278,7 +286,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                 if let Err(e) =
                     set_paused_activity(&mut client, &track, art_url.as_deref(), &opts)
                 {
-                    log::warn!("Failed to set paused Discord activity: {e}");
+                    tracing::warn!("Failed to set paused Discord activity: {e}");
                     connected = false;
                     set_status(
                         &status,
@@ -301,13 +309,14 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                 break;
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                // If disconnected, try to reconnect
+                // If disconnected, try to reconnect with exponential backoff
                 if !connected {
                     set_status(&status, DiscordStatus::Connecting);
                     if try_connect(&mut client) {
                         connected = true;
+                        reconnect_backoff = Duration::from_secs(1); // reset on success
                         set_status(&status, DiscordStatus::Connected);
-                        log::info!("Discord IPC reconnected");
+                        tracing::info!("Discord IPC reconnected");
                         // Replay the last known track
                         if let Some((ref track, ref art_url, paused)) = pending_track {
                             let opts = ActivityOptions {
@@ -331,7 +340,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                                 )
                             };
                             if let Err(e) = result {
-                                log::warn!("Failed to replay Discord activity: {e}");
+                                tracing::warn!("Failed to replay Discord activity: {e}");
                                 connected = false;
                                 set_status(
                                     &status,
@@ -340,6 +349,9 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                             }
                         }
                     } else {
+                        // Double the backoff, cap at 30s
+                        reconnect_backoff = (reconnect_backoff * 2).min(Duration::from_secs(30));
+                        tracing::debug!("Discord reconnect failed, next attempt in {:?}", reconnect_backoff);
                         set_status(&status, DiscordStatus::Disconnected);
                     }
                 }

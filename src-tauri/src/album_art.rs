@@ -52,7 +52,13 @@ pub struct AlbumArtResolver {
 }
 
 fn cache_key(artist: &str, album: &str) -> String {
-    format!("{}::{}", artist.to_lowercase().trim(), album.to_lowercase().trim())
+    let artist_clean = artist.to_lowercase().trim().to_string();
+    let album_clean = album.to_lowercase().trim().to_string();
+    if album_clean.is_empty() {
+        artist_clean
+    } else {
+        format!("{artist_clean}::{album_clean}")
+    }
 }
 
 fn now_unix_secs() -> u64 {
@@ -113,7 +119,7 @@ impl AlbumArtResolver {
         let mut cache: DiskCache = match serde_json::from_str(&data) {
             Ok(c) => c,
             Err(e) => {
-                log::warn!("Failed to parse art cache: {e}");
+                tracing::warn!("Failed to parse art cache: {e}");
                 return DiskCache::default();
             }
         };
@@ -132,7 +138,7 @@ impl AlbumArtResolver {
 
         // 1. Memory cache
         if let Some(entry) = self.memory_cache.get(&key) {
-            log::debug!("Art cache hit (memory): {key}");
+            tracing::debug!("Art cache hit (memory): {key}");
             return Some(entry.url.clone());
         }
 
@@ -141,7 +147,7 @@ impl AlbumArtResolver {
             let now = now_unix_secs();
             if now.saturating_sub(entry.fetched_at) < DISK_TTL_SECS {
                 let url = entry.url.clone();
-                log::debug!("Art cache hit (disk): {key}");
+                tracing::debug!("Art cache hit (disk): {key}");
                 self.insert_memory_cache(key, url.clone());
                 return Some(url);
             }
@@ -158,18 +164,23 @@ impl AlbumArtResolver {
     async fn fetch_from_itunes(&mut self, artist: &str, album: &str) -> Option<String> {
         self.enforce_rate_limit().await;
 
-        let query = format!("{} {}", artist, album);
+        let album_trimmed = album.trim();
+        let query = if album_trimmed.is_empty() {
+            artist.to_string()
+        } else {
+            format!("{} {}", artist, album_trimmed)
+        };
         let url = format!(
             "https://itunes.apple.com/search?term={}&media=music&entity=album&limit=1",
             urlencode(&query)
         );
 
-        log::info!("Fetching album art from iTunes: {url}");
+        tracing::info!("Fetching album art from iTunes: {url}");
 
         let resp = match self.client.get(&url).send().await {
             Ok(r) => r,
             Err(e) => {
-                log::warn!("iTunes API request failed: {e}");
+                tracing::warn!("iTunes API request failed: {e}");
                 return None;
             }
         };
@@ -177,7 +188,7 @@ impl AlbumArtResolver {
         let body: ItunesSearchResponse = match resp.json().await {
             Ok(b) => b,
             Err(e) => {
-                log::warn!("iTunes API response parse failed: {e}");
+                tracing::warn!("iTunes API response parse failed: {e}");
                 return None;
             }
         };
@@ -239,7 +250,7 @@ impl AlbumArtResolver {
 
         if let Some(parent) = self.disk_cache_path.parent() {
             if let Err(e) = std::fs::create_dir_all(parent) {
-                log::warn!("Failed to create cache dir: {e}");
+                tracing::warn!("Failed to create cache dir: {e}");
                 return;
             }
         }
@@ -247,13 +258,13 @@ impl AlbumArtResolver {
         match serde_json::to_string_pretty(&self.disk_cache) {
             Ok(json) => {
                 if let Err(e) = std::fs::write(&self.disk_cache_path, json) {
-                    log::warn!("Failed to write art cache: {e}");
+                    tracing::warn!("Failed to write art cache: {e}");
                 } else {
                     self.disk_cache_dirty = false;
-                    log::debug!("Art cache saved to {}", self.disk_cache_path.display());
+                    tracing::debug!("Art cache saved to {}", self.disk_cache_path.display());
                 }
             }
-            Err(e) => log::warn!("Failed to serialize art cache: {e}"),
+            Err(e) => tracing::warn!("Failed to serialize art cache: {e}"),
         }
     }
 }

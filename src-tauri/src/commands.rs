@@ -58,6 +58,7 @@ pub fn save_config(
     }
 
     // Persist to disk
+    tracing::info!("Saving config to disk");
     config::save_config(&new_config)?;
 
     // Sync tray checkbox if presence toggle changed

@@ -41,6 +41,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": null,
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Kassicus/AMDP/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFDMTQ5QjNGN0Y1QUY3NTkKUldSWjkxcC9QNXNVSEZuemFINXNvN0pPMXR5OGFBNUI4eCtYTjh6Z2wySG1RcytlY0hVaDRpUzYK"
+    }
   }
 }
