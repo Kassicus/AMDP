@@ -15,7 +15,17 @@
       {
         "title": "AMDP",
         "width": 520,
-        "height": 480
+        "height": 480,
+        "visible": false
+      },
+      {
+        "label": "settings",
+        "title": "AMDP Settings",
+        "url": "settings.html",
+        "width": 420,
+        "height": 520,
+        "visible": false,
+        "resizable": false
       }
     ],
     "security": {

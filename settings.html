@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/settings.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AMDP Settings</title>
+    <script type="module" src="/src/settings.ts" defer></script>
+  </head>
+
+  <body>
+    <main class="container">
+      <h1>Settings</h1>
+
+      <section class="section">
+        <h2 class="section-header">Presence</h2>
+        <div class="setting-row">
+          <label for="enable-on-launch">Enable Rich Presence</label>
+          <input type="checkbox" id="enable-on-launch" />
+        </div>
+        <div class="setting-row">
+          <label for="show-album-art">Show Album Art</label>
+          <input type="checkbox" id="show-album-art" />
+        </div>
+        <div class="setting-row">
+          <label for="show-timestamps">Show Timestamps</label>
+          <input type="checkbox" id="show-timestamps" />
+        </div>
+        <div class="setting-row">
+          <label for="display-format">Display Format</label>
+          <select id="display-format">
+            <option value="songArtist">Song — Artist</option>
+            <option value="artistSong">Artist — Song</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="idle-behavior">When Paused</label>
+          <select id="idle-behavior">
+            <option value="clearStatus">Clear Status</option>
+            <option value="showPaused">Show Paused</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-header">General</h2>
+        <div class="setting-row">
+          <label for="poll-interval">Poll Interval</label>
+          <div class="slider-group">
+            <input type="range" id="poll-interval" min="2" max="15" step="1" />
+            <span id="poll-interval-value" class="slider-value">5s</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label for="launch-at-login">Launch at Login</label>
+          <input type="checkbox" id="launch-at-login" />
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
