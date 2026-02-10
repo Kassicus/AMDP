@@ -1,3 +1,4 @@
+mod album_art;
 mod apple_music;
 mod commands;
 mod discord_rpc;
@@ -25,6 +26,7 @@ fn start_polling(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut ticker = interval(Duration::from_secs(5));
         let mut previous: Option<apple_music::TrackInfo> = None;
+        let mut art_resolver = album_art::AlbumArtResolver::new();
 
         loop {
             ticker.tick().await;
@@ -49,7 +51,8 @@ fn start_polling(app_handle: AppHandle) {
                     let state = app_handle.state::<AppState>();
                     match &result {
                         Some(track) if track.is_playing => {
-                            state.discord.update_track(track);
+                            let artwork_url = art_resolver.resolve(&track.artist, &track.album).await;
+                            state.discord.update_track(track, artwork_url);
                         }
                         _ => {
                             state.discord.clear_presence();

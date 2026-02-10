@@ -14,7 +14,7 @@ const DISCORD_APP_ID: &str = "1470809241907363921";
 
 #[allow(dead_code)]
 pub enum DiscordCommand {
-    UpdateTrack(TrackInfo),
+    UpdateTrack(TrackInfo, Option<String>),
     ClearPresence,
     Shutdown,
 }
@@ -46,8 +46,8 @@ impl DiscordManager {
         Self { tx, status }
     }
 
-    pub fn update_track(&self, track: &TrackInfo) {
-        let _ = self.tx.send(DiscordCommand::UpdateTrack(track.clone()));
+    pub fn update_track(&self, track: &TrackInfo, artwork_url: Option<String>) {
+        let _ = self.tx.send(DiscordCommand::UpdateTrack(track.clone(), artwork_url));
     }
 
     pub fn clear_presence(&self) {
@@ -93,6 +93,7 @@ fn truncate(s: &str, max_len: usize) -> &str {
 fn set_activity_from_track(
     client: &mut DiscordIpcClient,
     track: &TrackInfo,
+    artwork_url: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let now = now_secs();
     let position_secs = track.position_secs as i64;
@@ -101,6 +102,7 @@ fn set_activity_from_track(
     let start_ts = now - position_secs;
     let end_ts = start_ts + duration_secs;
 
+    let large_image = artwork_url.unwrap_or("apple_music_logo");
     let artist_text = format!("by {}", track.artist);
 
     let activity = Activity::new()
@@ -110,7 +112,7 @@ fn set_activity_from_track(
         .timestamps(Timestamps::new().start(start_ts).end(end_ts))
         .assets(
             Assets::new()
-                .large_image("apple_music_logo")
+                .large_image(large_image)
                 .large_text(truncate(&track.album, 128))
                 .small_image("apple_music_logo")
                 .small_text("Apple Music"),
@@ -124,7 +126,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
     let mut client = DiscordIpcClient::new(DISCORD_APP_ID);
     let mut connected = false;
     // Holds the last track so we can replay it after (re)connecting
-    let mut pending_track: Option<TrackInfo> = None;
+    let mut pending_track: Option<(TrackInfo, Option<String>)> = None;
 
     // Initial connection attempt with backoff
     set_status(&status, DiscordStatus::Connecting);
@@ -147,8 +149,8 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                 set_status(&status, DiscordStatus::Disconnected);
                 return;
             }
-            Ok(DiscordCommand::UpdateTrack(track)) => {
-                pending_track = Some(track);
+            Ok(DiscordCommand::UpdateTrack(track, art_url)) => {
+                pending_track = Some((track, art_url));
             }
             Ok(DiscordCommand::ClearPresence) => {
                 pending_track = None;
@@ -168,8 +170,8 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
 
     // Replay any track that arrived while we were connecting
     if connected {
-        if let Some(track) = pending_track.take() {
-            if let Err(e) = set_activity_from_track(&mut client, &track) {
+        if let Some((track, art_url)) = pending_track.take() {
+            if let Err(e) = set_activity_from_track(&mut client, &track, art_url.as_deref()) {
                 log::warn!("Failed to set initial Discord activity: {e}");
                 connected = false;
                 set_status(
@@ -177,7 +179,7 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                     DiscordStatus::Error(format!("Activity update failed: {e}")),
                 );
             } else {
-                pending_track = Some(track);
+                pending_track = Some((track, art_url));
             }
         }
     }
@@ -185,12 +187,12 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
     // Main event loop
     loop {
         match rx.recv_timeout(Duration::from_secs(1)) {
-            Ok(DiscordCommand::UpdateTrack(track)) => {
-                pending_track = Some(track.clone());
+            Ok(DiscordCommand::UpdateTrack(track, art_url)) => {
+                pending_track = Some((track.clone(), art_url.clone()));
                 if !connected {
                     continue;
                 }
-                if let Err(e) = set_activity_from_track(&mut client, &track) {
+                if let Err(e) = set_activity_from_track(&mut client, &track, art_url.as_deref()) {
                     log::warn!("Failed to set Discord activity: {e}");
                     connected = false;
                     set_status(
@@ -222,8 +224,8 @@ fn discord_thread_main(rx: mpsc::Receiver<DiscordCommand>, status: Arc<Mutex<Dis
                         set_status(&status, DiscordStatus::Connected);
                         log::info!("Discord IPC reconnected");
                         // Replay the last known track
-                        if let Some(track) = &pending_track {
-                            if let Err(e) = set_activity_from_track(&mut client, track) {
+                        if let Some((track, art_url)) = &pending_track {
+                            if let Err(e) = set_activity_from_track(&mut client, track, art_url.as_deref()) {
                                 log::warn!("Failed to replay Discord activity: {e}");
                                 connected = false;
                                 set_status(
