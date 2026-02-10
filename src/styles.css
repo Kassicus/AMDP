@@ -82,3 +82,36 @@ h1 {
   font-size: 1rem;
   color: #e2e8f0;
 }
+
+.discord-info {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d2d4a;
+}
+
+.discord-status {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.discord-status.connected {
+  background-color: #16a34a22;
+  color: #4ade80;
+}
+
+.discord-status.connecting {
+  background-color: #eab30822;
+  color: #facc15;
+}
+
+.discord-status.disconnected {
+  background-color: #64748b22;
+  color: #94a3b8;
+}
+
+.discord-status.error {
+  background-color: #dc262622;
+  color: #f87171;
+}

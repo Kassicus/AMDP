@@ -1,7 +1,9 @@
 mod apple_music;
 mod commands;
+mod discord_rpc;
 mod state;
 
+use discord_rpc::DiscordManager;
 use state::AppState;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::time::{interval, Duration};
@@ -42,6 +44,19 @@ fn start_polling(app_handle: AppHandle) {
             }
 
             if changed {
+                // Update Discord presence
+                {
+                    let state = app_handle.state::<AppState>();
+                    match &result {
+                        Some(track) if track.is_playing => {
+                            state.discord.update_track(track);
+                        }
+                        _ => {
+                            state.discord.clear_presence();
+                        }
+                    }
+                }
+
                 let _ = app_handle.emit("track-changed", &result);
                 previous = result;
             }
@@ -51,10 +66,15 @@ fn start_polling(app_handle: AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let discord = DiscordManager::start();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(AppState::new())
-        .invoke_handler(tauri::generate_handler![commands::get_current_track])
+        .manage(AppState::new(discord))
+        .invoke_handler(tauri::generate_handler![
+            commands::get_current_track,
+            commands::get_discord_status
+        ])
         .setup(|app| {
             start_polling(app.handle().clone());
             Ok(())

@@ -10,6 +10,12 @@ interface TrackInfo {
   isPlaying: boolean;
 }
 
+type DiscordStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | { error: string };
+
 function formatTime(secs: number): string {
   const minutes = Math.floor(secs / 60);
   const seconds = Math.floor(secs % 60);
@@ -42,11 +48,31 @@ function updateDisplay(track: TrackInfo | null) {
   );
 }
 
+function updateDiscordStatus(status: DiscordStatus) {
+  const el = document.getElementById("discord-status")!;
+
+  if (typeof status === "string") {
+    el.textContent =
+      status.charAt(0).toUpperCase() + status.slice(1);
+    el.className = `discord-status ${status}`;
+  } else {
+    el.textContent = `Error: ${status.error}`;
+    el.className = "discord-status error";
+  }
+}
+
+async function refreshDiscordStatus() {
+  const status = await invoke<DiscordStatus>("get_discord_status");
+  updateDiscordStatus(status);
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   const track = await invoke<TrackInfo | null>("get_current_track");
   updateDisplay(track);
+  await refreshDiscordStatus();
 
-  await listen<TrackInfo | null>("track-changed", (event) => {
+  await listen<TrackInfo | null>("track-changed", async (event) => {
     updateDisplay(event.payload);
+    await refreshDiscordStatus();
   });
 });
