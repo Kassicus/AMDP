@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 
 interface AppConfig {
   enableOnLaunch: boolean;
@@ -64,6 +65,10 @@ function scheduleSave() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+  const version = await getVersion();
+  const versionLabel = document.getElementById("version-label");
+  if (versionLabel) versionLabel.textContent = `AMDP v${version}`;
+
   const config = await invoke<AppConfig>("get_config");
   populateForm(config);
 

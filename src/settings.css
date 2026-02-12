@@ -90,3 +90,10 @@ h1 {
   min-width: 2rem;
   text-align: right;
 }
+
+.version-label {
+  font-size: 0.75rem;
+  color: #475569;
+  text-align: center;
+  padding-top: 0.5rem;
+}

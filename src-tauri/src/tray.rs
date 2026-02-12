@@ -3,10 +3,26 @@ use std::io::{BufRead, BufReader};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{App, Emitter, Manager};
+use tauri::{App, AppHandle, Emitter, Manager};
 
 use crate::config;
 use crate::state::AppState;
+
+/// Relaunch the app after an update by spawning `open -a` with a short delay,
+/// then exiting the current process. `AppHandle::restart()` does not reliably
+/// relaunch macOS menu-bar apps, so we use `open` instead.
+fn relaunch_app(app: &AppHandle) {
+    if let Ok(exe) = std::env::current_exe() {
+        // Walk up from Contents/MacOS/binary to the .app bundle
+        if let Some(bundle) = exe.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+            let _ = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(format!("sleep 1 && open '{}'", bundle.display()))
+                .spawn();
+        }
+    }
+    app.exit(0);
+}
 
 pub fn setup_tray(app: &App) -> tauri::Result<()> {
     let state = app.state::<AppState>();
@@ -118,8 +134,8 @@ pub fn setup_tray(app: &App) -> tauri::Result<()> {
 
                             match update.download_and_install(|_, _| {}, || {}).await {
                                 Ok(()) => {
-                                    tracing::info!("Update installed, restarting...");
-                                    app_handle.restart();
+                                    tracing::info!("Update installed, relaunching...");
+                                    relaunch_app(&app_handle);
                                 }
                                 Err(e) => {
                                     tracing::warn!("Update install failed: {e}");
