@@ -1,6 +1,6 @@
 [package]
 name = "amdp"
-version = "0.3.2"
+version = "0.3.3"
 description = "Apple Music Discord Presence"
 authors = ["you"]
 edition = "2021"
